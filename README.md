@@ -39,7 +39,7 @@ void some_function() {
   BEGIN_TRY {
     some_func_that_can_raise();
   }
-  CATCH(SOMETHING_THAT_WAS ENUMED) {
+  CATCH(SOMETHING_THAT_WAS_ENUMED) {
     some_code_that_responds_to_a_raise();
   }
   // The CATCH() parameter is an int.
