@@ -18,7 +18,7 @@ First let me tell you that we are going to abuse the C preprocessor as well as t
 
 From a high level, the ```BEGIN_TRY``` macro calls ```setjmp()``` to create a non-local branch in the code. If ```RAISE```  is called then that non-local branch is taken using ```longjmp()``` and the exception handler and any user-created code is executed. The problem with this is that the ```TRY/CATCH``` blocks can be nested. So, the ```jmp_buf``` instances are kept in a stack. The stack is pushed in a ```BEGIN_TRY``` block and popped in an ```CATCH``` block. Other than that, there is no magic. 
 
-## General format of use"
+## General format of use
 ```C
 // Include the exceptions header.
 #include "exceptions.h"
