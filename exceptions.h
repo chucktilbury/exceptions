@@ -1,66 +1,72 @@
+/*
+ * Exceptions for the C language.
+ *
+ * This is a partial implementation of exceptions using non-local GOTOs for use
+ * for error handling in C programs.
+ *
+ * Exceptions are raised and caught using an enum handle. This handle has to be
+ * specified in the CATCH macro as well as when raising the exception.
+ *
+ * Exception BEGIN_TRY{} block jmp_buf's are stored in a stack. If there is a
+ * CATCH{} block on the top of the stack, then it is popped and jongjmp()ed. If
+ * there is a CATCH() {} clause for that handle, then that code is entered, else
+ * the next one is tried. This happens until there are no more TRY{} blocks on
+ * the stack and in that case, the exception is considered to be unhandled and
+ * the program is exited with an error message.
+ *
+ * A call stack could be maintained with modifications to the user's source
+ * code, but that is not acceptable for this simple solution.
+ *
+ * Most of the code associated wit this functionality -must- be in a macro for
+ * it to work. This is because the setjmp() stores the -current- state of the
+ * program. That means that there can be no function calls between that and
+ * the mandatory if() that follows.
+ *
+ */
+#ifndef _EXCEPTIONS_H_
+#define _EXCEPTIONS_H_
 
-
-#ifndef EXCEPTIONS_H
-#define EXCEPTIONS_H
-
-#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <setjmp.h>
 
-/*
- * Type definition for an exception handler.
- */
-typedef void (*exception_handler_func_ptr)();
+typedef struct _ex_stack_ {
+    jmp_buf buf;
+    struct _ex_stack_* next;
+} _ExStack;
 
-/*
- * The stack of jmp_buf's facilitates nesting and handling the exceptions in a
- * location other than where it was generated.
- */
-typedef struct __sptr__ {
-    jmp_buf jbuf;
-    struct __sptr__* next;
-} jmp_buf_stack, *jmp_buf_stack_ptr;
+extern _ExStack* exstack;
 
-/*
- * Macros for the actual exception implementation. See the example for an
- * example.
- */
-#define TRY { \
-        jmp_buf_stack_ptr sp = push_exception(); \
-        exception_handler_func_ptr f = make_excep_hand_ptr(setjmp(sp->jbuf)); \
-        if(f == 0) {
+#define RAISE(V) do { \
+        jmp_buf buf; \
+        _ExStack* ptr = exstack; \
+        memcpy(buf, ptr->buf, sizeof(jmp_buf)); \
+        exstack = ptr->next; \
+        free(ptr); \
+        longjmp(buf, (V)); \
+    } while(0)
 
-#define EXCEPT(handler_name) } else if(f == handler_name) { \
-            pop_exception(); \
-            handler_name();
+#define BEGIN_TRY do{ \
+    _ExStack* ptr = malloc(sizeof(_ExStack)); \
+    if(ptr == NULL) { \
+        fprintf(stderr, "memory allocation error\n"); \
+        abort(); \
+    } \
+    ptr->next = exstack; \
+    exstack = ptr; \
+    int _exception_number = setjmp(ptr->buf); \
+    if(_exception_number == 0)
 
-#define END_EXCEPT } else { \
-            pop_exception(); \
-            raise_exception(f, NULL, NULL, 0); \
-        }}
+#define CATCH(V) else if(_exception_number == (V))
 
-#define RAISE(fp) raise_exception(fp, #fp, __func__, __LINE__)
-
-/*
- * These macros are for the call stack. The call stack is required if you want
- * it to display if there is an unhandled exception. The call stack is also
- * displayed if a signal is caught.
- */
-#define ENTER push_call_stack(__FILE__, __func__, __LINE__)
-#define RETURN do { pop_call_stack(); return; } while(0)
-#define RETURN_VAL(v) do { pop_call_stack(); return(v); } while(0)
-
-/*
- * None of these functions should ever be accessed directly. Macros are
- * provided for all functionality.
- */
-void push_call_stack(const char*, const char*, int);
-void pop_call_stack();
-
-exception_handler_func_ptr make_excep_hand_ptr(int);
-void raise_exception(exception_handler_func_ptr, const char*, const char*, int);
-jmp_buf_stack_ptr push_exception();
-void pop_exception();
-void init_exceptions();
+#define END_TRY  else { \
+    if(exstack != NULL) { \
+        RAISE(_exception_number); \
+    } \
+    else { \
+        fprintf(stderr, "Unhandled exception: %d\n", _exception_number); \
+        abort(); \
+    }}} while(0);
 
 
 #endif

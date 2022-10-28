@@ -1,13 +1,9 @@
 
 
-all: etest libexceptions.a
+all: tst
 
-libexceptions.a:
-	gcc -Wall -Wextra -g -c -o exceptions.o exceptions.c
-	ar -cr libexceptions.a exceptions.o
-
-etest: libexceptions.a
-	gcc -Wall -Wextra -g -o etest etest.c -L. -lexceptions
+tst:
+	gcc -Wall -Wextra -g -o tst test.c
 
 clean:
-	-rm -f etest libexceptions.a *.o
+	-rm -f tst
